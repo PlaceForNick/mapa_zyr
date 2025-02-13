@@ -65,18 +65,13 @@
         2023.0: '#deb29b'
     };
 
-    // 📌 Stylowanie obiektów (kontury, brak wypełnienia)
+    // 📌 Stylowanie obiektów
     function getFeatureStyle(feature) {
-        var year = feature.get('OD');
-        var color = colorMap[year] || '#000000'; // Domyślnie czarny, jeśli brak wartości
+        var year = parseInt(feature.get('OD')); // Konwersja na liczbę
+        var color = colorMap[year] || '#000000'; // Domyślny kolor
         return new ol.style.Style({
-            //stroke: new ol.style.Stroke({
-            //    color: color,
-            //    width: 2
-            //}),
-            fill: new ol.style.Fill({
-               color: color
-            }) // Przezroczyste wnętrze
+            stroke: new ol.style.Stroke({ color: color, width: 1 }),
+            fill: new ol.style.Fill({ color: color })
         });
     }
 
@@ -100,18 +95,21 @@
     var yearSlider = document.getElementById('year-slider');
     var yearLabel = document.getElementById('year-label');
 
-    yearSlider.addEventListener('input', function() {
-        var selectedYear = parseInt(this.value);
-        yearLabel.textContent = selectedYear;
+    yearSlider.addEventListener('input', function () {
+    var selectedYear = Number(this.value);
+    yearLabel.textContent = selectedYear;
 
-        // 🔄 Filtrujemy obiekty, aby były widoczne tylko te, które pasują do zakresu czasu
-        vectorSource.getFeatures().forEach(function(feature) {
-            var startYear = feature.get('OD');
-            var endYear = feature.get('DO');
-            var isVisible = startYear <= selectedYear && endYear >= selectedYear;
-            feature.setStyle(isVisible ? getFeatureStyle(feature) : null);
-        });
+    // 🔄 Filtrujemy obiekty
+    vectorSource.getFeatures().forEach(function (feature) {
+        var startYear = Number(feature.get('OD')) || 0;
+        var endYear = Number(feature.get('DO')) || 2025; // Domyślnie do 2025 jeśli brak wartości
+
+        var isVisible = startYear <= selectedYear && endYear >= selectedYear;
+
+        // ✅ Nowy obiekt stylu lub null (ukrycie obiektu)
+        feature.setStyle(isVisible ? getFeatureStyle(feature) : new ol.style.Style({}));
     });
+});
 
 </script>
 
