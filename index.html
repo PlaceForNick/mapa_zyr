@@ -3,56 +3,117 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mapa OpenLayers z GeoJSON</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@latest/ol.css">
-    <script src="https://cdn.jsdelivr.net/npm/ol@latest/dist/ol.js"></script>
+    <title>Mapa z warstwą GeoJSON i animacją</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ol/7.2.2/ol.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.8.0/proj4.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/ol/7.2.2/ol.css">
+    <script src="https://cdn.jsdelivr.net/npm/ol@7.2.2/dist/ol.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@7.2.2/ol.css">
 
     <style>
-        #map {
-            width: 100%;
-            height: 500px;
+        body { margin: 0; font-family: Arial, sans-serif; }
+        #map { width: 100%; height: 90vh; }
+        #slider-container {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            background: white;
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        #year-slider {
+            width: 300px;
+            margin: 0 10px;
         }
     </style>
 </head>
 <body>
-    <h2>Mapa Świata - OpenLayers + GeoJSON</h2>
-    <div id="map"></div>
-    <script>
-      // Rejestracja projekcji EPSG:2180
-      proj4.defs("EPSG:2180","+proj=tmerc +lat_0=0 +lon_0=19 +k=0.9993 +x_0=500000 +y_0=-5300000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs");
-      ol.proj.proj4.register(proj4);
 
-      // Tworzenie źródła wektorowego
-      var vectorSource = new ol.source.Vector({
-          url: 'layers/bud2.geojson', // Ścieżka do pliku
-          format: new ol.format.GeoJSON({
-              dataProjection: 'EPSG:2180',  // Określamy rzeczywisty układ danych
-              featureProjection: 'EPSG:3857' // Transformujemy na układ OpenLayers
-          })
-      });
+<div id="map"></div>
+<div id="slider-container">
+    Rok: <span id="year-label">1917</span>
+    <input type="range" id="year-slider" min="1917" max="2025" value="1917" step="1">
+</div>
 
-      // Warstwa wektorowa
-      var vectorLayer = new ol.layer.Vector({
-          source: vectorSource,
-          style: new ol.style.Style({
-              stroke: new ol.style.Stroke({ color: 'red', width: 2 }),
-              fill: new ol.style.Fill({ color: 'rgba(255, 0, 0, 0.3)' })
-          })
-      });
+<script>
+    // 📌 Rejestracja układu EPSG:2180
+    proj4.defs("EPSG:2180","+proj=tmerc +lat_0=0 +lon_0=19 +k=0.9993 +x_0=500000 +y_0=-5300000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs");
+    ol.proj.proj4.register(proj4);
 
-      // Inicjalizacja mapy
-      var map = new ol.Map({
-          target: 'map',
-          layers: [
-              new ol.layer.Tile({ source: new ol.source.OSM() }),
-              vectorLayer
-          ],
-          view: new ol.View({
-              center: ol.proj.transform([19, 52], 'EPSG:4326', 'EPSG:3857'),
-              zoom: 6
-          })
-      });
-    </script>
+    // 📌 Mapa
+    var map = new ol.Map({
+        target: 'map',
+        layers: [
+            new ol.layer.Tile({ source: new ol.source.OSM() })
+        ],
+        view: new ol.View({
+            center: ol.proj.transform([19, 52], 'EPSG:4326', 'EPSG:3857'),
+            zoom: 6
+        })
+    });
+
+    // 📌 Kolory dla różnych wartości "OD"
+    var colorMap = {
+        1917.0: '#6f3d24',
+        1944.0: '#9a5632',
+        1972.0: '#c16b3f',
+        1992.0: '#cd8966',
+        2023.0: '#deb29b'
+    };
+
+    // 📌 Stylowanie obiektów (kontury, brak wypełnienia)
+    function getFeatureStyle(feature) {
+        var year = feature.get('OD');
+        var color = colorMap[year] || '#000000'; // Domyślnie czarny, jeśli brak wartości
+        return new ol.style.Style({
+            //stroke: new ol.style.Stroke({
+            //    color: color,
+            //    width: 2
+            //}),
+            fill: new ol.style.Fill({
+               color: color
+            }) // Przezroczyste wnętrze
+        });
+    }
+
+    // 📌 Warstwa wektorowa
+    var vectorSource = new ol.source.Vector({
+        url: 'layers/bud.geojson',
+        format: new ol.format.GeoJSON({
+            dataProjection: 'EPSG:2180',
+            featureProjection: 'EPSG:3857'
+        })
+    });
+
+    var vectorLayer = new ol.layer.Vector({
+        source: vectorSource,
+        style: getFeatureStyle
+    });
+
+    map.addLayer(vectorLayer);
+
+    // 📌 Obsługa suwaka czasu
+    var yearSlider = document.getElementById('year-slider');
+    var yearLabel = document.getElementById('year-label');
+
+    yearSlider.addEventListener('input', function() {
+        var selectedYear = parseInt(this.value);
+        yearLabel.textContent = selectedYear;
+
+        // 🔄 Filtrujemy obiekty, aby były widoczne tylko te, które pasują do zakresu czasu
+        vectorSource.getFeatures().forEach(function(feature) {
+            var startYear = feature.get('OD');
+            var endYear = feature.get('DO');
+            var isVisible = startYear <= selectedYear && endYear >= selectedYear;
+            feature.setStyle(isVisible ? getFeatureStyle(feature) : null);
+        });
+    });
+
+</script>
+
 </body>
 </html>
