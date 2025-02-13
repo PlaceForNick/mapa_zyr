@@ -40,78 +40,191 @@
 </div>
 
 <script>
-    // 📌 Rejestracja układu EPSG:2180
-    proj4.defs("EPSG:2180","+proj=tmerc +lat_0=0 +lon_0=19 +k=0.9993 +x_0=500000 +y_0=-5300000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs");
-    ol.proj.proj4.register(proj4);
+  // 📌 Rejestracja układu EPSG:2180
+  proj4.defs("EPSG:2180", "+proj=tmerc +lat_0=0 +lon_0=19 +k=0.9993 +x_0=500000 +y_0=-5300000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs");
+  ol.proj.proj4.register(proj4);
 
-    // 📌 Mapa
-    var map = new ol.Map({
-        target: 'map',
-        layers: [
-            new ol.layer.Tile({ source: new ol.source.OSM() })
-        ],
-        view: new ol.View({
-            center: ol.proj.transform([19, 52], 'EPSG:4326', 'EPSG:3857'),
-            zoom: 6
-        })
-    });
+  // 📌 Inicjalizacja mapy
+  var map = new ol.Map({
+      target: 'map',
+      layers: [
+          new ol.layer.Tile({ source: new ol.source.OSM() })
+      ],
+      view: new ol.View({
+          center: ol.proj.transform([19, 52], 'EPSG:4326', 'EPSG:3857'),
+          zoom: 6
+      })
+  });
 
-    // 📌 Kolory dla różnych wartości "OD"
-    var colorMap = {
-        1917.0: '#6f3d24',
-        1944.0: '#9a5632',
-        1972.0: '#c16b3f',
-        1992.0: '#cd8966',
-        2023.0: '#deb29b'
-    };
+  // 📌 Funkcja stylizująca różne warstwy
+  function getFeatureStyle(feature, type) {
+      var color, strokeColor, strokeWidth, fillColor;
 
-    // 📌 Stylowanie obiektów
-    function getFeatureStyle(feature) {
-        var year = parseInt(feature.get('OD')); // Konwersja na liczbę
-        var color = colorMap[year] || '#000000'; // Domyślny kolor
-        return new ol.style.Style({
-            stroke: new ol.style.Stroke({ color: color, width: 1 }),
-            fill: new ol.style.Fill({ color: color })
-        });
-    }
+      switch (type) {
+          case 'bud': // Budynki (różne kolory zależne od OD)
+              var year = parseInt(feature.get('OD')) || 1917;
+              var colorMap = {
+                  1917: '#6f3d24',
+                  1944: '#9a5632',
+                  1972: '#c16b3f',
+                  1992: '#cd8966',
+                  2023: '#deb29b'
+              };
+              fillColor = colorMap[year] || '#000000';
+              return new ol.style.Style({
+                  stroke: new ol.style.Stroke({ color: fillColor, width: 1 }),
+                  fill: new ol.style.Fill({ color: fillColor })
+              });
 
-    // 📌 Warstwa wektorowa
-    var vectorSource = new ol.source.Vector({
-        url: 'layers/bud.geojson',
-        format: new ol.format.GeoJSON({
-            dataProjection: 'EPSG:2180',
-            featureProjection: 'EPSG:3857'
-        })
-    });
+          case 'zab': // Zabytki (punkty z ikoną)
+              return new ol.style.Style({
+                  image: new ol.style.Icon({
+                      anchor: [0.5, 1],
+                      src: 'icons/zabytek_symbol.png',
+                      scale: 0.08
+                  })
+              });
 
-    var vectorLayer = new ol.layer.Vector({
-        source: vectorSource,
-        style: getFeatureStyle
-    });
+          case 'tor': // Tory (#686868, grubość 0.4pt)
+              return new ol.style.Style({
+                  stroke: new ol.style.Stroke({ color: '#686868', width: 0.4 })
+              });
 
-    map.addLayer(vectorLayer);
+          case 'plc': // Place (kontur #b9b7b9 0.4pt, wnętrze białe)
+              return new ol.style.Style({
+                  stroke: new ol.style.Stroke({ color: '#b9b7b9', width: 0.4 }),
+                  fill: new ol.style.Fill({ color: '#ffffff' })
+              });
 
-    // 📌 Obsługa suwaka czasu
+          case 'drg': // Drogi (biały środek 3.2pt, na zewnątrz #b9b7b9 0.4pt)
+              return [
+                  new ol.style.Style({
+                      stroke: new ol.style.Stroke({ color: '#b9b7b9', width: 4 })
+                  }),
+                  new ol.style.Style({
+                      stroke: new ol.style.Stroke({ color: '#ffffff', width: 3.2 })
+                  })
+              ];
+
+          case 'cen': // Cenzura (czerwony kontur przerywany 0.4pt, czerwony deseń wnętrza)
+              return new ol.style.Style({
+                  stroke: new ol.style.Stroke({ color: 'red', width: 0.4, lineDash: [4, 4] }),
+                  fill: new ol.style.Fill({ color: 'rgba(255, 0, 0, 0.3)' })
+              });
+
+          case 'wod': // Woda (wypełnienie #446589)
+              return new ol.style.Style({
+                  fill: new ol.style.Fill({ color: '#446589' })
+              });
+
+          case 'rzk': // Rzeki (#446589, grubość 2pt)
+              return new ol.style.Style({
+                  stroke: new ol.style.Stroke({ color: '#446589', width: 2 })
+              });
+
+          case 'zln': // Zieleń (wypełnienie #c6e2b2)
+              return new ol.style.Style({
+                  fill: new ol.style.Fill({ color: '#c6e2b2' })
+              });
+
+          case 'grn': // Granice (czarny przerywany kontur 0.4pt, wypełnienie #e1e1e1)
+              return new ol.style.Style({
+                  stroke: new ol.style.Stroke({ color: 'black', width: 0.4, lineDash: [4, 4] }),
+                  fill: new ol.style.Fill({ color: '#e1e1e1' })
+              });
+
+          default:
+              return new ol.style.Style({}); // Domyślny styl
+      }
+  }
+
+  // 📌 Funkcja dodająca warstwę wektorową
+  function addVectorLayer(url, type) {
+      var source = new ol.source.Vector({
+          url: url,
+          format: new ol.format.GeoJSON({
+              dataProjection: 'EPSG:2180',
+              featureProjection: 'EPSG:3857'
+          })
+      });
+
+      var layer = new ol.layer.Vector({
+          source: source,
+          style: function (feature) { return getFeatureStyle(feature, type); }
+      });
+
+      map.addLayer(layer);
+      return { source, layer };
+  }
+
+  // 📌 Dodanie wszystkich warstw
+  var layers = {
+      bud: addVectorLayer('layers/bud.geojson', 'bud'),
+      zab: addVectorLayer('layers/zab.geojson', 'zab'),
+      tor: addVectorLayer('layers/tor.geojson', 'tor'),
+      plc: addVectorLayer('layers/plc.geojson', 'plc'),
+      drg: addVectorLayer('layers/drg.geojson', 'drg'),
+      cen: addVectorLayer('layers/cen.geojson', 'cen'),
+      wod: addVectorLayer('layers/wod.geojson', 'wod'),
+      rzk: addVectorLayer('layers/rzk.geojson', 'rzk'),
+      zln: addVectorLayer('layers/zln.geojson', 'zln'),
+      //grn: addVectorLayer('layers/grn.geojson', 'grn')
+  };
+
+  document.addEventListener("DOMContentLoaded", function () {
     var yearSlider = document.getElementById('year-slider');
     var yearLabel = document.getElementById('year-label');
 
+    // 📌 Funkcja filtrująca obiekty na podstawie suwaka
+    function filterFeaturesByTime(selectedYear) {
+        console.log("🔄 Filtrowanie dla roku:", selectedYear);
+        
+        Object.entries(layers).forEach(([type, layerObj]) => {
+            layerObj.source.getFeatures().forEach(function (feature) {
+                var startYear = parseInt(feature.get('OD')) || 1917;
+                var endYear = parseInt(feature.get('DO')) || 2025;
+
+                console.log(`🛠 Obiekt: ${feature.getId()} | OD: ${startYear} | DO: ${endYear}`);
+
+                var isVisible = startYear <= selectedYear && endYear >= selectedYear;
+
+                // ✅ Jeśli widoczny → ustawiamy jego styl
+                // ✅ Jeśli ukrywamy → ustawiamy pusty styl, ale nie null
+                if (isVisible) {
+                    feature.setStyle(getFeatureStyle(feature, type));
+                } else {
+                    feature.setStyle(new ol.style.Style({}));
+                }
+            });
+        });
+    }
+
+    // 📌 Obsługa suwaka czasu
     yearSlider.addEventListener('input', function () {
-    var selectedYear = Number(this.value);
-    yearLabel.textContent = selectedYear;
-
-    // 🔄 Filtrujemy obiekty
-    vectorSource.getFeatures().forEach(function (feature) {
-        var startYear = Number(feature.get('OD')) || 0;
-        var endYear = Number(feature.get('DO')) || 2025; // Domyślnie do 2025 jeśli brak wartości
-
-        var isVisible = startYear <= selectedYear && endYear >= selectedYear;
-
-        // ✅ Nowy obiekt stylu lub null (ukrycie obiektu)
-        feature.setStyle(isVisible ? getFeatureStyle(feature) : new ol.style.Style({}));
+        var selectedYear = parseInt(this.value);
+        yearLabel.textContent = selectedYear;
+        filterFeaturesByTime(selectedYear);
     });
+
+    // 📌 Po załadowaniu mapy ustaw filtrowanie na początkowy rok
+    filterFeaturesByTime(parseInt(yearSlider.value));
 });
 
+
+
+/* 
+      Object.values(layers).forEach(function (layerObj) {
+          layerObj.source.getFeatures().forEach(function (feature) {
+              var startYear = Number(feature.get('OD')) || 0;
+              var endYear = Number(feature.get('DO')) || 2025;
+              var isVisible = startYear <= selectedYear && endYear >= selectedYear;
+
+              feature.setStyle(isVisible ? getFeatureStyle(feature, layerObj.type) : new ol.style.Style({}));
+          });
+      });
+  }); */
 </script>
+
 
 </body>
 </html>
